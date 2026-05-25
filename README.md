@@ -76,6 +76,7 @@ That would be wrong for this model.
 | --- | --- |
 | `src/patch_kimi.py` | Patches actual Kimi q/kv LoRA RMSNorm projection pairs |
 | `src/benchmark_kimi26.py` | Kimi-shaped CUDA benchmarks for q/kv direct pairs |
+| `src/benchmark_kimi26_quantized.py` | Quantization-aware synthetic INT8 weight-folding benchmark |
 | `scripts/run_kimi26_cuda_benchmarks.sh` | Runs all Kimi synthetic CUDA benchmarks |
 | `README.md` | This Kimi-specific guide |
 
@@ -211,6 +212,17 @@ python3 -m src.benchmark_kimi26 --config kimi_q_b_long --variant V3
 python3 -m src.benchmark_kimi26 --config kimi_kv_b_long --variant V3
 ```
 
+Run quantization-aware synthetic checks:
+
+```bash
+python3 -m src.benchmark_kimi26_quantized --config kimi_q_b
+python3 -m src.benchmark_kimi26_quantized --config kimi_kv_b
+```
+
+These use per-output-channel INT8 weight quantization and dequantize to BF16
+before matmul. This validates the folding order, but it is not a production
+INT8/INT4 fused GEMM.
+
 For H100, set:
 
 ```bash
@@ -280,6 +292,28 @@ Use fused q_b_proj for short and medium token counts.
 Use fused kv_b_proj for short and medium token counts.
 Do not blindly patch long kv_b paths until a better kernel/heuristic is added.
 ```
+
+## Quantized LLM Status
+
+Current status:
+
+```text
+Not yet run as a full quantized Kimi K2.6 LLM.
+```
+
+What has been added is a quantization-aware synthetic benchmark:
+
+```text
+RMSNorm gamma is folded into the projection weight first.
+The folded weight is quantized with per-output-channel INT8.
+The benchmark compares baseline quantized weights vs fused quantized weights.
+```
+
+This answers whether the algebra works with quantized weights. It does not yet
+answer production INT4/INT8 serving speed, because the current CUDA fusion
+kernel expects BF16 weights. For real quantized LLM acceleration, the next step
+is a fused dequantize + RMS denominator + GEMM path, or integration with a
+serving stack such as vLLM/AWQ/GPTQ.
 
 Save environment:
 
@@ -380,4 +414,3 @@ results/kimi26/kimi_kv_b_v3.txt
 results/kimi26/kimi_q_b_long_v3.txt
 results/kimi26/kimi_kv_b_long_v3.txt
 ```
-
