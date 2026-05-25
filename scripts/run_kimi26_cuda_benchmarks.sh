@@ -2,9 +2,13 @@
 set -euo pipefail
 
 mkdir -p results/kimi26
+export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-9.0}"
 
 python3 -m src.test_kimi26_kernels | tee results/kimi26/correctness.txt
-python3 -m src.benchmark_kimi26 --config kimi_q_b --variant V3 | tee results/kimi26/kimi_q_b_v3.txt
-python3 -m src.benchmark_kimi26 --config kimi_kv_b --variant V3 | tee results/kimi26/kimi_kv_b_v3.txt
-python3 -m src.benchmark_kimi26 --config kimi_q_b_long --variant V3 | tee results/kimi26/kimi_q_b_long_v3.txt
-python3 -m src.benchmark_kimi26 --config kimi_kv_b_long --variant V3 | tee results/kimi26/kimi_kv_b_long_v3.txt
+
+for variant in V1 V3; do
+  python3 -m src.benchmark_kimi26 --config kimi_q_b --variant "${variant}" | tee "results/kimi26/kimi_q_b_${variant,,}.txt"
+  python3 -m src.benchmark_kimi26 --config kimi_kv_b --variant "${variant}" | tee "results/kimi26/kimi_kv_b_${variant,,}.txt"
+  python3 -m src.benchmark_kimi26 --config kimi_q_b_long --variant "${variant}" | tee "results/kimi26/kimi_q_b_long_${variant,,}.txt"
+  python3 -m src.benchmark_kimi26 --config kimi_kv_b_long --variant "${variant}" | tee "results/kimi26/kimi_kv_b_long_${variant,,}.txt"
+done

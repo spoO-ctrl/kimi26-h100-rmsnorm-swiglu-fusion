@@ -168,6 +168,7 @@ Set CUDA path:
 
 ```bash
 export CUDA_HOME=/usr/local/cuda-12.8
+export TORCH_CUDA_ARCH_LIST=9.0
 ```
 
 If that path does not exist:
@@ -205,6 +206,14 @@ python3 -m src.benchmark_kimi26 --config kimi_kv_b --variant V3
 python3 -m src.benchmark_kimi26 --config kimi_q_b_long --variant V3
 python3 -m src.benchmark_kimi26 --config kimi_kv_b_long --variant V3
 ```
+
+For H100, set:
+
+```bash
+export TORCH_CUDA_ARCH_LIST=9.0
+```
+
+This avoids compiling kernels for every visible architecture.
 
 Benchmark configs:
 
@@ -296,6 +305,7 @@ On a fresh RunPod:
 ```bash
 cd /workspace/kimi26-h100-rmsnorm-swiglu-fusion
 export CUDA_HOME=/usr/local/cuda-12.8
+export TORCH_CUDA_ARCH_LIST=9.0
 python3 -m src.test_kimi26_kernels
 bash scripts/run_kimi26_cuda_benchmarks.sh
 ```
