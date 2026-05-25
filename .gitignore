@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.so
+*.o
+*.egg-info/
+build/
+dist/
+.cache/
+*.d
+results/*.nsys-rep
