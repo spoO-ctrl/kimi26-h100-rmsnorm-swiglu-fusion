@@ -381,17 +381,3 @@ results/kimi26/kimi_q_b_long_v3.txt
 results/kimi26/kimi_kv_b_long_v3.txt
 ```
 
-## Current Status
-
-Implemented:
-
-- Kimi-specific README
-- Kimi q/kv LoRA RMSNorm patcher
-- Kimi-shaped CUDA synthetic benchmarks
-- RunPod benchmark script
-
-Next:
-
-- Add a shape/token-count heuristic to `patch_kimi.py`
-- Validate actual Kimi patch counts
-- Integrate into a full Kimi serving stack only after synthetic results look good
