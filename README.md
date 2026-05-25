@@ -91,8 +91,12 @@ Patch these:
 
 | Original Kimi pair | Fused replacement |
 | --- | --- |
-| `q_a_layernorm -> q_b_proj` | `q_a_layernorm = Identity`, `q_b_proj = FusedRMSNormLinearV3(...)` |
-| `kv_a_layernorm -> kv_b_proj` | `kv_a_layernorm = Identity`, `kv_b_proj = FusedRMSNormLinearV3(...)` |
+| `q_a_layernorm -> q_b_proj` | `q_a_layernorm = Identity`, `q_b_proj = FusedRMSNormLinear(...)` |
+| `kv_a_layernorm -> kv_b_proj` | `kv_a_layernorm = Identity`, `kv_b_proj = FusedRMSNormLinear(...)` |
+
+Current H100 synthetic results show that fusion should be applied
+conditionally. It is strong for the 512-token q/kv projection benchmarks, close
+to neutral for long q, and slower for long kv.
 
 Expected full-model patch count:
 
@@ -224,6 +228,59 @@ Benchmark configs:
 | `kimi_q_b_long` | Longer q benchmark | `(4096, 1536) -> 12288` |
 | `kimi_kv_b_long` | Longer kv benchmark | `(4096, 512) -> 16384` |
 
+## H100 Benchmark Results
+
+Environment:
+
+| Item | Value |
+| --- | --- |
+| GPU | `NVIDIA H100 80GB HBM3` |
+| Driver CUDA | `13.0` from `nvidia-smi` |
+| PyTorch | `2.8.0+cu128` |
+| PyTorch CUDA | `12.8` |
+| dtype | `bfloat16` |
+| `CUDA_HOME` | `/usr/local/cuda-12.8` |
+| `TORCH_CUDA_ARCH_LIST` | `9.0` |
+
+Kimi-specific correctness:
+
+| Config | Variant | Shape | Max Diff | Mean Diff | Status |
+| --- | --- | --- | ---: | ---: | --- |
+| `kimi_q_b` | `V1` | `(512, 1536) -> 12288` | `3.125000e-02` | `1.097941e-03` | PASS |
+| `kimi_q_b` | `V3` | `(512, 1536) -> 12288` | `3.125000e-02` | `1.097941e-03` | PASS |
+| `kimi_kv_b` | `V1` | `(512, 512) -> 16384` | `1.562500e-02` | `1.127254e-03` | PASS |
+| `kimi_kv_b` | `V3` | `(512, 512) -> 16384` | `1.562500e-02` | `1.127254e-03` | PASS |
+
+Synthetic benchmark results:
+
+| Config | Variant | Shape | Baseline | Fused | Speedup | Max Diff | Mean Diff |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `kimi_q_b` | `V1` | `(512, 1536) -> 12288` | `0.0628 ms` | `0.0378 ms` | `1.660x` | `3.125000e-02` | `1.097941e-03` |
+| `kimi_kv_b` | `V1` | `(512, 512) -> 16384` | `0.0530 ms` | `0.0269 ms` | `1.971x` | `1.562500e-02` | `1.127254e-03` |
+| `kimi_q_b_long` | `V1` | `(4096, 1536) -> 12288` | `0.2992 ms` | `0.2858 ms` | `1.047x` | `3.125000e-02` | `1.107869e-03` |
+| `kimi_kv_b_long` | `V1` | `(4096, 512) -> 16384` | `0.1546 ms` | `0.2057 ms` | `0.752x` | `3.125000e-02` | `1.147462e-03` |
+| `kimi_q_b` | `V3` | `(512, 1536) -> 12288` | `0.0631 ms` | `0.0383 ms` | `1.648x` | `3.125000e-02` | `1.097941e-03` |
+| `kimi_kv_b` | `V3` | `(512, 512) -> 16384` | `0.0666 ms` | `0.0274 ms` | `2.429x` | `1.562500e-02` | `1.127254e-03` |
+| `kimi_q_b_long` | `V3` | `(4096, 1536) -> 12288` | `0.3000 ms` | `0.2900 ms` | `1.035x` | `3.125000e-02` | `1.107869e-03` |
+| `kimi_kv_b_long` | `V3` | `(4096, 512) -> 16384` | `0.1540 ms` | `0.2050 ms` | `0.751x` | `3.125000e-02` | `1.147462e-03` |
+
+Interpretation:
+
+| Scenario | Recommendation |
+| --- | --- |
+| 512-token `q_b_proj` | Fuse; both V1 and V3 are about `1.65x` faster |
+| 512-token `kv_b_proj` | Fuse; V3 reached `2.429x`, V1 reached `1.971x` |
+| 4096-token `q_b_proj` | Optional; speedup is small at `1.035x-1.047x` |
+| 4096-token `kv_b_proj` | Do not fuse with current kernel; it is about `25%` slower |
+
+Current best policy:
+
+```text
+Use fused q_b_proj for short and medium token counts.
+Use fused kv_b_proj for short and medium token counts.
+Do not blindly patch long kv_b paths until a better kernel/heuristic is added.
+```
+
 Save environment:
 
 ```bash
@@ -314,6 +371,10 @@ Paste the outputs from:
 
 ```text
 results/kimi26/correctness.txt
+results/kimi26/kimi_q_b_v1.txt
+results/kimi26/kimi_kv_b_v1.txt
+results/kimi26/kimi_q_b_long_v1.txt
+results/kimi26/kimi_kv_b_long_v1.txt
 results/kimi26/kimi_q_b_v3.txt
 results/kimi26/kimi_kv_b_v3.txt
 results/kimi26/kimi_q_b_long_v3.txt
@@ -331,6 +392,6 @@ Implemented:
 
 Next:
 
-- Run CUDA benchmarks on H100 or 4090
+- Add a shape/token-count heuristic to `patch_kimi.py`
 - Validate actual Kimi patch counts
 - Integrate into a full Kimi serving stack only after synthetic results look good
