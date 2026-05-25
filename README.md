@@ -179,13 +179,15 @@ export CUDA_HOME=/usr/local/cuda
 
 ## Correctness
 
-Run the inherited CUDA correctness tests:
+Run the Kimi-specific CUDA correctness tests:
 
 ```bash
-python3 -m src.test_correctness
+python3 -m src.test_kimi26_kernels
 ```
 
-The first run JIT-builds the CUDA extension.
+The first run JIT-builds the CUDA extension. The inherited upstream
+`src.test_correctness` also runs old OPT/Llama/GPT-OSS integration tests and is
+not required for this Kimi workflow.
 
 ## Kimi Synthetic Benchmarks
 
@@ -294,7 +296,7 @@ On a fresh RunPod:
 ```bash
 cd /workspace/kimi26-h100-rmsnorm-swiglu-fusion
 export CUDA_HOME=/usr/local/cuda-12.8
-python3 -m src.test_correctness
+python3 -m src.test_kimi26_kernels
 bash scripts/run_kimi26_cuda_benchmarks.sh
 ```
 
