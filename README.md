@@ -148,3 +148,14 @@ End-to-end benchmarking on the full Kimi K2.6 model was not completed because of
 | `src/benchmark_kimi26_quantized.py` | Quantization-aware INT8 benchmark |
 | `src/test_kimi26_kernels.py` | Kimi-specific correctness tests |
 | `scripts/run_kimi26_cuda_benchmarks.sh` | Runs benchmarks and saves results |
+
+
+## Conclusion
+
+The RMSNorm fusion kernel works correctly and delivers meaningful speedups at Kimi K2.6's actual tensor dimensions. The `q_a_layernorm → q_b_proj` and `kv_a_layernorm → kv_b_proj` pairs — the two direct norm-to-projection sites in Kimi's MLA block — are valid fusion targets and show 1.65× and 2.43× kernel-level speedup respectively at 512-token sequence lengths. These are treated as the confirmed kernel-level result for Kimi K2.6.
+
+End-to-end benchmarking was blocked by three architectural constraints: compressed INT4/FP8 weights incompatible with weight absorption, MLA's LoRA-compressed attention structure diverging from the standard Q/K/V pattern the base repo patches, and MoE routing preventing expert-level norm fusion. These are not gaps to fix — they define the boundary of where this technique applies.
+
+The natural next targets for full end-to-end fusion are dense BF16 models with standard RMSNorm → Q/K/V structure, where the base repo already demonstrates 1.41–1.65× end-to-end speedup on Llama. For Kimi K2.6 specifically, closing the end-to-end gap would require either a fused dequantize + RMS + GEMM kernel for compressed weights, or running against a full BF16 checkpoint on sufficient VRAM — both viable follow-on tracks.
+Applying it properly would require additional research into fusing with compressed weights, which is a separate problem space.
+
